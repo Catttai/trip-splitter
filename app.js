@@ -171,6 +171,7 @@ function resetForm() {
   editingId = null;
   form.classList.remove('editing');
   $('submit').textContent = 'Add';
+  $('form-h').textContent = 'New expense';
   $('cancel').hidden = $('delete').hidden = true;
   $('error').textContent = '';
   fill({ paidBy: keep });
@@ -182,6 +183,7 @@ function startEdit(e) {
   editingId = e.id;
   form.classList.add('editing');
   $('submit').textContent = 'Save';
+  $('form-h').textContent = 'Edit expense';
   $('cancel').hidden = $('delete').hidden = false;
   $('error').textContent = '';
   const raw = {};
@@ -268,13 +270,13 @@ function render() {
           el(
             'li',
             {},
-            el('span', {}, t.from, el('span', { class: 'muted' }, ' pays '), t.to),
+            el('span', { class: 'who' }, el('span', {}, t.from), el('span', { class: 'muted pays' }, 'pays'), el('span', {}, t.to)),
             el('span', { class: 'money' }, money(t.amount)),
           ),
         )
       : [el('li', { class: 'empty' }, expenses.length ? 'All square' : 'Nothing owed yet')]),
   );
-  $('total').textContent = expenses.length ? `${money(total)} spent in total` : '';
+  $('total').textContent = money(total);
 
   const shown = [...expenses].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   $('expenses').replaceChildren(
@@ -315,7 +317,20 @@ function setStatus(state, text) {
   s.title = text;
 }
 
+function applyTheme(light) {
+  document.documentElement.dataset.theme = light ? 'light' : 'dark';
+  document.querySelector('meta[name=theme-color]').content = light ? '#f2ede5' : '#121714';
+  $('theme').textContent = light ? 'Dark mode' : 'Light mode';
+  try {
+    localStorage.setItem('trip-splitter:theme', light ? 'light' : 'dark');
+  } catch {}
+}
+
+$('theme').addEventListener('click', () => applyTheme(document.documentElement.dataset.theme !== 'light'));
+
 // ---------- start ----------
+
+applyTheme(document.documentElement.dataset.theme === 'light');
 
 fill(loadDraft());
 

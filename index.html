@@ -4,24 +4,29 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Trip Splitter</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <meta name="theme-color" content="#121714">
+  <script>
+    try { if (localStorage.getItem('trip-splitter:theme') === 'light') document.documentElement.dataset.theme = 'light'; } catch {}
+  </script>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main>
-    <header>
-      <h1>Trip Splitter</h1>
-      <span class="status" id="status" data-state="connecting"></span>
-    </header>
-
-    <section>
+    <section class="hero">
+      <header>
+        <h1>Trip Splitter</h1>
+        <span class="status" id="status" data-state="connecting"></span>
+      </header>
+      <div class="total">
+        <span class="label">Trip total</span>
+        <span class="total-amt money" id="total"></span>
+      </div>
       <ul class="transfers" id="transfers"></ul>
-      <p class="total" id="total"></p>
     </section>
 
     <form id="form" class="panel" novalidate autocomplete="off">
+      <h2 id="form-h">New expense</h2>
       <div class="inputs">
         <input name="description" type="text" maxlength="120" placeholder="What for">
         <input name="amount" type="text" inputmode="decimal" placeholder="0.00">
@@ -50,10 +55,13 @@
       </div>
     </form>
 
-    <section>
+    <section class="list">
       <h2>Expenses</h2>
       <ul class="expenses" id="expenses"></ul>
     </section>
+    <footer>
+      <button type="button" class="link" id="theme">Light mode</button>
+    </footer>
   </main>
 
   <script type="module" src="app.js"></script>
