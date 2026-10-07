@@ -1,0 +1,36 @@
+rules_version = '2';
+
+// Anyone with the link can read and edit this trip's expenses, but only
+// well-formed expense documents are accepted, and nothing else in the
+// database is reachable.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isPerson(p) {
+      return p in ['Shinyi', 'Shilya', 'Aichen', 'Cat'];
+    }
+
+    function validSplit(s) {
+      return s.mode == 'equal'
+          && s.keys().hasOnly(['mode', 'people'])
+          && s.people is list && s.people.size() > 0 && s.people.size() <= 4
+          || s.mode == 'custom'
+          && s.keys().hasOnly(['mode', 'shares'])
+          && s.shares is map && s.shares.size() > 0 && s.shares.size() <= 4;
+    }
+
+    function validExpense(e) {
+      return e.keys().hasOnly(['description', 'amount', 'date', 'paidBy', 'split', 'createdAt', 'updatedAt'])
+          && e.description is string && e.description.size() > 0 && e.description.size() <= 120
+          && e.amount is int && e.amount > 0 && e.amount < 100000000
+          && e.date is string && e.date.size() == 10
+          && isPerson(e.paidBy)
+          && e.split is map && validSplit(e.split);
+    }
+
+    match /trips/{tripId}/expenses/{expenseId} {
+      allow read, delete: if true;
+      allow create, update: if validExpense(request.resource.data);
+    }
+  }
+}

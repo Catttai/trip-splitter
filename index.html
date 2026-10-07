@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Trip Splitter</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main>
+    <header class="top">
+      <h1>Trip Splitter</h1>
+      <p class="status" id="status" data-state="connecting">Loading…</p>
+    </header>
+
+    <section class="card" aria-labelledby="settle-h">
+      <div class="card-head">
+        <h2 id="settle-h">Who owes who</h2>
+        <span class="muted" id="total"></span>
+      </div>
+      <ul class="transfers" id="transfers"></ul>
+    </section>
+
+    <section class="card" aria-labelledby="form-h">
+      <div class="card-head">
+        <h2 id="form-h">Add an expense</h2>
+      </div>
+      <form id="form" novalidate autocomplete="off">
+        <div class="row">
+          <label class="field grow">
+            <span>What was it</span>
+            <input name="description" type="text" maxlength="120" placeholder="e.g. Dinner at the night market" required>
+          </label>
+        </div>
+        <div class="row">
+          <label class="field">
+            <span>Amount</span>
+            <input name="amount" type="text" inputmode="decimal" placeholder="0.00" required>
+          </label>
+          <label class="field">
+            <span>Date</span>
+            <input name="date" type="date" required>
+          </label>
+        </div>
+
+        <fieldset class="field">
+          <legend>Paid by</legend>
+          <div class="segmented" id="payer"></div>
+        </fieldset>
+
+        <fieldset class="field">
+          <legend>Split</legend>
+          <div class="segmented">
+            <label><input type="radio" name="mode" value="equal" checked><span>Equally</span></label>
+            <label><input type="radio" name="mode" value="custom"><span>Custom amounts</span></label>
+          </div>
+          <div class="split-list" id="split"></div>
+          <p class="hint" id="split-hint"></p>
+        </fieldset>
+
+        <p class="error" id="error" role="alert"></p>
+        <div class="actions">
+          <button type="submit" class="primary" id="submit">Add expense</button>
+          <button type="button" class="ghost" id="cancel" hidden>Cancel</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="card" aria-labelledby="bal-h">
+      <div class="card-head">
+        <h2 id="bal-h">Balances</h2>
+      </div>
+      <table class="balances">
+        <thead>
+          <tr><th>Name</th><th>Paid</th><th>Share</th><th>Balance</th></tr>
+        </thead>
+        <tbody id="balances"></tbody>
+      </table>
+    </section>
+
+    <section class="card" aria-labelledby="list-h">
+      <div class="card-head">
+        <h2 id="list-h">Expenses</h2>
+        <div class="filters" id="filters"></div>
+      </div>
+      <ul class="expenses" id="expenses"></ul>
+    </section>
+  </main>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
