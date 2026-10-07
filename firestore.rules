@@ -20,10 +20,9 @@ service cloud.firestore {
     }
 
     function validExpense(e) {
-      return e.keys().hasOnly(['description', 'amount', 'date', 'paidBy', 'split', 'createdAt', 'updatedAt'])
+      return e.keys().hasOnly(['description', 'amount', 'paidBy', 'split', 'createdAt', 'updatedAt'])
           && e.description is string && e.description.size() > 0 && e.description.size() <= 120
           && e.amount is int && e.amount > 0 && e.amount < 100000000
-          && e.date is string && e.date.size() == 10
           && isPerson(e.paidBy)
           && e.split is map && validSplit(e.split);
     }

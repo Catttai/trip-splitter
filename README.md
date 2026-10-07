@@ -7,6 +7,7 @@ live, who owes who how much.
 - Everyone's screen updates instantly as expenses change.
 - Everything is saved, so nothing needs retyping. A half-filled form is kept too.
 - Split each expense equally among whoever was part of it, or enter exact amounts.
+- Tap an expense to edit or delete it.
 - "Who owes who" uses as few payments as possible.
 
 Trip settings (names, currency) are in `config.js`.

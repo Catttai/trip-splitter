@@ -6,86 +6,52 @@
   <title>Trip Splitter</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
   <main>
-    <header class="top">
+    <header>
       <h1>Trip Splitter</h1>
-      <p class="status" id="status" data-state="connecting">Loading…</p>
+      <span class="status" id="status" data-state="connecting"></span>
     </header>
 
-    <section class="card" aria-labelledby="settle-h">
-      <div class="card-head">
-        <h2 id="settle-h">Who owes who</h2>
-        <span class="muted" id="total"></span>
-      </div>
+    <section>
       <ul class="transfers" id="transfers"></ul>
+      <p class="total" id="total"></p>
     </section>
 
-    <section class="card" aria-labelledby="form-h">
-      <div class="card-head">
-        <h2 id="form-h">Add an expense</h2>
+    <form id="form" class="panel" novalidate autocomplete="off">
+      <div class="inputs">
+        <input name="description" type="text" maxlength="120" placeholder="What for">
+        <input name="amount" type="text" inputmode="decimal" placeholder="0.00">
       </div>
-      <form id="form" novalidate autocomplete="off">
-        <div class="row">
-          <label class="field grow">
-            <span>What was it</span>
-            <input name="description" type="text" maxlength="120" placeholder="e.g. Dinner at the night market" required>
-          </label>
-        </div>
-        <div class="row">
-          <label class="field">
-            <span>Amount</span>
-            <input name="amount" type="text" inputmode="decimal" placeholder="0.00" required>
-          </label>
-          <label class="field">
-            <span>Date</span>
-            <input name="date" type="date" required>
-          </label>
-        </div>
 
-        <fieldset class="field">
-          <legend>Paid by</legend>
-          <div class="segmented" id="payer"></div>
-        </fieldset>
-
-        <fieldset class="field">
-          <legend>Split</legend>
-          <div class="segmented">
-            <label><input type="radio" name="mode" value="equal" checked><span>Equally</span></label>
-            <label><input type="radio" name="mode" value="custom"><span>Custom amounts</span></label>
-          </div>
-          <div class="split-list" id="split"></div>
-          <p class="hint" id="split-hint"></p>
-        </fieldset>
-
-        <p class="error" id="error" role="alert"></p>
-        <div class="actions">
-          <button type="submit" class="primary" id="submit">Add expense</button>
-          <button type="button" class="ghost" id="cancel" hidden>Cancel</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="card" aria-labelledby="bal-h">
-      <div class="card-head">
-        <h2 id="bal-h">Balances</h2>
+      <div class="line">
+        <span class="label">Paid by</span>
+        <div class="pills" id="payer"></div>
       </div>
-      <table class="balances">
-        <thead>
-          <tr><th>Name</th><th>Paid</th><th>Share</th><th>Balance</th></tr>
-        </thead>
-        <tbody id="balances"></tbody>
-      </table>
-    </section>
 
-    <section class="card" aria-labelledby="list-h">
-      <div class="card-head">
-        <h2 id="list-h">Expenses</h2>
-        <div class="filters" id="filters"></div>
+      <div class="line">
+        <span class="label">Split</span>
+        <div class="pills" id="split"></div>
       </div>
+      <div class="custom" id="custom" hidden></div>
+      <div class="split-foot">
+        <span class="hint" id="hint"></span>
+        <button type="button" class="link" id="mode">Custom amounts</button>
+      </div>
+
+      <p class="error" id="error" role="alert"></p>
+      <div class="actions">
+        <button type="submit" class="primary" id="submit">Add</button>
+        <button type="button" class="link" id="cancel" hidden>Cancel</button>
+        <button type="button" class="link danger" id="delete" hidden>Delete</button>
+      </div>
+    </form>
+
+    <section>
+      <h2>Expenses</h2>
       <ul class="expenses" id="expenses"></ul>
     </section>
   </main>

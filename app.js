@@ -8,182 +8,153 @@ const money = (cents) => fmt.format(cents / 100);
 const DRAFT_KEY = 'trip-splitter:' + TRIP_ID + ':draft';
 
 const form = $('form');
+const f = form.elements;
 let expenses = [];
 let editingId = null;
-let filter = 'All';
 let store = null;
 
-// ---------- small DOM helper ----------
+// Form state that isn't held by a plain input.
+let paidBy = '';
+let mode = 'equal';
+let people = [...PEOPLE];
 
 function el(tag, attrs = {}, ...children) {
   const node = document.createElement(tag);
   for (const [k, v] of Object.entries(attrs)) {
     if (k === 'class') node.className = v;
     else if (k.startsWith('on')) node.addEventListener(k.slice(2), v);
-    else if (v === true) node.setAttribute(k, '');
-    else if (v !== false && v != null) node.setAttribute(k, v);
+    else if (v != null && v !== false) node.setAttribute(k, v);
   }
-  for (const c of children.flat()) {
-    if (c != null) node.append(c);
-  }
+  node.append(...children.flat().filter((c) => c != null));
   return node;
-}
-
-function today() {
-  const d = new Date();
-  d.setMinutes(d.getMinutes() - d.getTimezoneOffset());
-  return d.toISOString().slice(0, 10);
-}
-
-function prettyDate(iso) {
-  if (!iso) return '';
-  const [y, m, d] = iso.split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
 }
 
 // ---------- form ----------
 
-function buildPayer() {
+function pill(name, on, onclick) {
+  return el('button', { type: 'button', class: 'pill', 'aria-pressed': String(on), onclick }, name);
+}
+
+function renderPills() {
   $('payer').replaceChildren(
+    ...PEOPLE.map((p) => pill(p, paidBy === p, () => { paidBy = p; changed(); })),
+  );
+  $('split').parentElement.hidden = mode !== 'equal';
+  $('split').replaceChildren(
     ...PEOPLE.map((p) =>
-      el('label', {}, el('input', { type: 'radio', name: 'paidBy', value: p }), el('span', {}, p)),
+      pill(p, people.includes(p), () => {
+        people = people.includes(p) ? people.filter((x) => x !== p) : PEOPLE.filter((x) => x === p || people.includes(x));
+        changed();
+      }),
     ),
   );
 }
 
-function mode() {
-  return form.elements.mode.value;
+function buildCustom(values = {}) {
+  $('custom').replaceChildren(
+    ...PEOPLE.map((p) =>
+      el(
+        'label',
+        { class: 'custom-row' },
+        el('span', {}, p),
+        el('input', { type: 'text', inputmode: 'decimal', placeholder: '0.00', 'data-person': p, value: values[p] ?? '' }),
+      ),
+    ),
+  );
 }
 
-function buildSplit(state = {}) {
-  const box = $('split');
-  if (mode() === 'equal') {
-    const people = state.people || PEOPLE;
-    box.replaceChildren(
-      ...PEOPLE.map((p) =>
-        el(
-          'label',
-          { class: 'split-row' },
-          el('input', { type: 'checkbox', name: 'eq', value: p, checked: people.includes(p) }),
-          el('span', { class: 'name' }, p),
-          el('span', { class: 'amt', 'data-for': p }),
-        ),
-      ),
-    );
-  } else {
-    const shares = state.shares || {};
-    box.replaceChildren(
-      ...PEOPLE.map((p) =>
-        el(
-          'label',
-          { class: 'split-row' },
-          el('span', { class: 'name' }, p),
-          el('input', {
-            type: 'text',
-            inputmode: 'decimal',
-            name: 'cs',
-            'data-person': p,
-            placeholder: '0.00',
-            value: shares[p] ?? '',
-          }),
-        ),
-      ),
-    );
-  }
-  updateSplitHint();
+function customRaw() {
+  const out = {};
+  for (const i of $('custom').querySelectorAll('input')) out[i.dataset.person] = i.value;
+  return out;
 }
 
-function readForm() {
-  const f = form.elements;
+function customSum() {
+  return Object.values(customRaw()).reduce((a, v) => a + toCents(v), 0);
+}
+
+function setMode(m, values) {
+  mode = m;
+  $('custom').hidden = m !== 'custom';
+  $('mode').textContent = m === 'custom' ? 'Split equally' : 'Custom amounts';
+  if (m === 'custom') buildCustom(values);
+}
+
+function updateHint() {
   const amount = toCents(f.amount.value);
-  const people = [...form.querySelectorAll('input[name=eq]:checked')].map((i) => i.value);
-  const customRaw = {};
-  for (const i of form.querySelectorAll('input[name=cs]')) customRaw[i.dataset.person] = i.value;
-  return {
-    description: f.description.value.trim(),
-    amountRaw: f.amount.value,
-    amount,
-    date: f.date.value,
-    paidBy: f.paidBy.value,
-    mode: mode(),
-    people,
-    customRaw,
-  };
-}
-
-function updateSplitHint() {
-  const s = readForm();
-  const hint = $('split-hint');
-  hint.classList.remove('bad', 'good');
-  if (s.mode === 'equal') {
-    const shares = equalShares(s.amount, s.people);
-    for (const span of form.querySelectorAll('.amt')) {
-      const c = shares[span.dataset.for];
-      span.textContent = c != null && s.amount ? money(c) : '';
-    }
-    hint.textContent = s.people.length
-      ? `Split ${s.people.length} way${s.people.length > 1 ? 's' : ''}.`
-      : 'Pick at least one person.';
-    if (!s.people.length) hint.classList.add('bad');
+  const hint = $('hint');
+  hint.className = 'hint';
+  if (mode === 'equal') {
+    if (!people.length) {
+      hint.textContent = 'Pick at least one person';
+      hint.classList.add('bad');
+    } else if (amount) {
+      const each = equalShares(amount, people);
+      const vals = new Set(Object.values(each));
+      hint.textContent = vals.size === 1 ? `${money(each[people[0]])} each` : `About ${money(Math.round(amount / people.length))} each`;
+    } else hint.textContent = '';
   } else {
-    const sum = Object.values(s.customRaw).reduce((a, v) => a + toCents(v), 0);
-    const left = s.amount - sum;
-    if (!s.amount) hint.textContent = 'Enter the total amount first.';
-    else if (left === 0) {
-      hint.textContent = 'Adds up to the total.';
-      hint.classList.add('good');
-    } else if (left > 0) {
-      hint.textContent = `${money(left)} left to assign.`;
-      hint.classList.add('bad');
-    } else {
-      hint.textContent = `${money(-left)} over the total.`;
+    const left = amount - customSum();
+    if (!amount) hint.textContent = '';
+    else if (left === 0) hint.textContent = 'Adds up';
+    else {
+      hint.textContent = left > 0 ? `${money(left)} left` : `${money(-left)} over`;
       hint.classList.add('bad');
     }
   }
 }
 
-function validate(s) {
-  if (!s.description) return 'Add a short description.';
-  if (!(s.amount > 0)) return 'Enter an amount greater than zero.';
-  if (!s.date) return 'Pick a date.';
-  if (!s.paidBy) return 'Choose who paid.';
-  if (s.mode === 'equal' && !s.people.length) return 'Pick at least one person to split with.';
-  if (s.mode === 'custom') {
-    const sum = Object.values(s.customRaw).reduce((a, v) => a + toCents(v), 0);
-    if (sum !== s.amount) return 'Custom amounts must add up to the total.';
-  }
+function changed() {
+  renderPills();
+  updateHint();
+  $('error').textContent = '';
+  saveDraft();
+}
+
+function validate() {
+  const amount = toCents(f.amount.value);
+  if (!f.description.value.trim()) return 'Add what it was for';
+  if (!(amount > 0)) return 'Enter an amount';
+  if (!paidBy) return 'Choose who paid';
+  if (mode === 'equal' && !people.length) return 'Pick who to split with';
+  if (mode === 'custom' && customSum() !== amount) return 'Amounts need to add up to the total';
   return '';
 }
 
-function toExpense(s) {
+function toExpense() {
+  const amount = toCents(f.amount.value);
   let split;
-  if (s.mode === 'equal') {
-    split = { mode: 'equal', people: PEOPLE.filter((p) => s.people.includes(p)) };
+  if (mode === 'equal') {
+    split = { mode: 'equal', people: [...people] };
   } else {
+    const raw = customRaw();
     const shares = {};
     for (const p of PEOPLE) {
-      const c = toCents(s.customRaw[p] || 0);
+      const c = toCents(raw[p] || 0);
       if (c > 0) shares[p] = c;
     }
     split = { mode: 'custom', shares };
   }
-  return { description: s.description, amount: s.amount, date: s.date, paidBy: s.paidBy, split };
+  return { description: f.description.value.trim(), amount, paidBy, split };
 }
 
-function fillForm(state) {
-  const f = form.elements;
-  f.description.value = state.description || '';
-  f.amount.value = state.amountRaw || '';
-  f.date.value = state.date || today();
-  for (const r of form.querySelectorAll('input[name=paidBy]')) r.checked = r.value === state.paidBy;
-  for (const r of form.querySelectorAll('input[name=mode]')) r.checked = r.value === (state.mode || 'equal');
-  buildSplit({ people: state.people, shares: state.customRaw });
+function fill(s = {}) {
+  f.description.value = s.description || '';
+  f.amount.value = s.amountRaw || '';
+  paidBy = s.paidBy || '';
+  people = s.people ? PEOPLE.filter((p) => s.people.includes(p)) : [...PEOPLE];
+  setMode(s.mode || 'equal', s.customRaw);
+  renderPills();
+  updateHint();
 }
 
 function saveDraft() {
   if (editingId) return;
   try {
-    localStorage.setItem(DRAFT_KEY, JSON.stringify(readForm()));
+    localStorage.setItem(
+      DRAFT_KEY,
+      JSON.stringify({ description: f.description.value, amountRaw: f.amount.value, paidBy, mode, people, customRaw: customRaw() }),
+    );
   } catch {}
 }
 
@@ -196,196 +167,143 @@ function loadDraft() {
 }
 
 function resetForm() {
-  const keepPayer = form.elements.paidBy.value;
+  const keep = paidBy;
   editingId = null;
-  $('form-h').textContent = 'Add an expense';
-  $('submit').textContent = 'Add expense';
-  $('cancel').hidden = true;
+  form.classList.remove('editing');
+  $('submit').textContent = 'Add';
+  $('cancel').hidden = $('delete').hidden = true;
   $('error').textContent = '';
-  fillForm({ paidBy: keepPayer });
+  fill({ paidBy: keep });
   saveDraft();
+  render();
 }
 
 function startEdit(e) {
   editingId = e.id;
-  $('form-h').textContent = 'Edit expense';
-  $('submit').textContent = 'Save changes';
-  $('cancel').hidden = false;
+  form.classList.add('editing');
+  $('submit').textContent = 'Save';
+  $('cancel').hidden = $('delete').hidden = false;
   $('error').textContent = '';
-  const customRaw = {};
+  const raw = {};
   if (e.split.mode === 'custom') {
-    for (const [p, c] of Object.entries(e.split.shares)) customRaw[p] = (c / 100).toFixed(2);
+    for (const [p, c] of Object.entries(e.split.shares)) raw[p] = (c / 100).toFixed(2);
   }
-  fillForm({
+  fill({
     description: e.description,
     amountRaw: (e.amount / 100).toFixed(2),
-    date: e.date,
     paidBy: e.paidBy,
     mode: e.split.mode,
     people: e.split.mode === 'equal' ? e.split.people : PEOPLE,
-    customRaw,
+    customRaw: raw,
   });
-  form.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  render();
+  form.scrollIntoView({ behavior: 'smooth', block: 'center' });
 }
 
-form.addEventListener('input', (ev) => {
-  if (ev.target.name === 'mode') {
-    // Switching to custom: prefill with the equal split as a starting point.
-    const s = readForm();
-    const shares = {};
-    if (ev.target.value === 'custom' && s.amount) {
-      for (const [p, c] of Object.entries(equalShares(s.amount, s.people))) shares[p] = (c / 100).toFixed(2);
-    }
-    buildSplit({ shares });
-  } else {
-    updateSplitHint();
-  }
+form.addEventListener('input', () => {
+  updateHint();
   $('error').textContent = '';
   saveDraft();
 });
 
+$('mode').addEventListener('click', () => {
+  if (mode === 'equal') {
+    // Start custom from the equal split so only the differences need typing.
+    const amount = toCents(f.amount.value);
+    const start = {};
+    if (amount) for (const [p, c] of Object.entries(equalShares(amount, people))) start[p] = (c / 100).toFixed(2);
+    setMode('custom', start);
+  } else {
+    setMode('equal');
+  }
+  changed();
+});
+
 form.addEventListener('submit', async (ev) => {
   ev.preventDefault();
-  const s = readForm();
-  const msg = validate(s);
+  const msg = validate();
   if (msg) {
     $('error').textContent = msg;
     return;
   }
   const now = Date.now();
-  const exp = toExpense(s);
-  const btn = $('submit');
-  btn.disabled = true;
+  const exp = toExpense();
   try {
     if (editingId) {
       const old = expenses.find((x) => x.id === editingId);
-      await store.update(editingId, { ...exp, createdAt: old?.createdAt || now, updatedAt: now });
+      store.update(editingId, { ...exp, createdAt: old?.createdAt || now, updatedAt: now }).catch(showError);
     } else {
-      // Don't wait for the server: Firestore applies it locally right away.
-      store.add({ ...exp, createdAt: now, updatedAt: now }).catch(showSaveError);
+      // No await: the change shows locally at once and syncs in the background.
+      store.add({ ...exp, createdAt: now, updatedAt: now }).catch(showError);
     }
     resetForm();
   } catch (err) {
-    showSaveError(err);
-  } finally {
-    btn.disabled = false;
+    showError(err);
   }
 });
 
-function showSaveError(err) {
+$('cancel').addEventListener('click', resetForm);
+
+$('delete').addEventListener('click', () => {
+  const e = expenses.find((x) => x.id === editingId);
+  if (!e || !confirm(`Delete "${e.description}"?`)) return;
+  store.remove(e.id).catch(showError);
+  resetForm();
+});
+
+function showError(err) {
   console.error(err);
   $('error').textContent = 'Could not save: ' + err.message;
 }
 
-$('cancel').addEventListener('click', resetForm);
-
 // ---------- rendering ----------
 
 function render() {
-  const bal = balances(expenses, PEOPLE);
   const total = expenses.reduce((a, e) => a + e.amount, 0);
-  $('total').textContent = expenses.length ? `${money(total)} total` : '';
+  const transfers = settle(balances(expenses, PEOPLE));
 
-  const transfers = settle(bal);
   $('transfers').replaceChildren(
     ...(transfers.length
       ? transfers.map((t) =>
           el(
             'li',
             {},
-            el('span', {}, el('strong', {}, t.from), ' pays ', el('strong', {}, t.to)),
+            el('span', {}, t.from, el('span', { class: 'muted' }, ' pays '), t.to),
             el('span', { class: 'money' }, money(t.amount)),
           ),
         )
-      : [el('li', { class: 'empty' }, expenses.length ? 'Everyone is square.' : 'No expenses yet. Add the first one below.')]),
+      : [el('li', { class: 'empty' }, expenses.length ? 'All square' : 'Nothing owed yet')]),
   );
+  $('total').textContent = expenses.length ? `${money(total)} spent in total` : '';
 
-  $('balances').replaceChildren(
-    ...PEOPLE.map((p) => {
-      const b = bal[p];
-      const cls = b.net > 0 ? 'pos' : b.net < 0 ? 'neg' : '';
-      const net = b.net > 0 ? 'gets back ' + money(b.net) : b.net < 0 ? 'owes ' + money(-b.net) : 'even';
-      return el(
-        'tr',
-        {},
-        el('td', {}, p),
-        el('td', { class: 'num' }, money(b.paid)),
-        el('td', { class: 'num' }, money(b.share)),
-        el('td', { class: 'num ' + cls }, net),
-      );
-    }),
-  );
-
-  $('filters').replaceChildren(
-    ...['All', ...PEOPLE].map((p) =>
-      el(
-        'button',
-        {
-          type: 'button',
-          class: 'chip' + (filter === p ? ' on' : ''),
-          'aria-pressed': String(filter === p),
-          onclick: () => {
-            filter = p;
-            render();
-          },
-        },
-        p,
-      ),
-    ),
-  );
-
-  const shown = expenses
-    .filter((e) => filter === 'All' || e.paidBy === filter)
-    .sort((a, b) => (b.date || '').localeCompare(a.date || '') || (b.createdAt || 0) - (a.createdAt || 0));
-
+  const shown = [...expenses].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
   $('expenses').replaceChildren(
-    ...(shown.length
-      ? shown.map(expenseRow)
-      : [el('li', { class: 'empty' }, filter === 'All' ? 'Nothing here yet.' : `Nothing paid by ${filter} yet.`)]),
+    ...(shown.length ? shown.map(expenseRow) : [el('li', { class: 'empty' }, 'No expenses yet')]),
   );
 }
 
 function splitText(e) {
   if (e.split.mode === 'custom') {
-    return 'Custom: ' + Object.entries(sharesOf(e)).map(([p, c]) => `${p} ${money(c)}`).join(', ');
+    return Object.entries(sharesOf(e)).map(([p, c]) => `${p} ${money(c)}`).join(', ');
   }
-  const ppl = e.split.people;
-  if (ppl.length === PEOPLE.length) return `Split ${ppl.length} ways`;
-  return 'Split between ' + ppl.join(', ');
+  return e.split.people.length === PEOPLE.length ? '' : e.split.people.join(', ');
 }
 
 function expenseRow(e) {
+  const detail = splitText(e);
   return el(
     'li',
-    { class: editingId === e.id ? 'editing' : '' },
+    {},
     el(
-      'div',
-      { class: 'exp-main' },
-      el('div', { class: 'exp-title' }, el('span', {}, e.description), el('span', { class: 'money' }, money(e.amount))),
-      el('div', { class: 'exp-meta' }, `${prettyDate(e.date)} · Paid by ${e.paidBy}`),
-      el('div', { class: 'exp-meta' }, splitText(e)),
-    ),
-    el(
-      'div',
-      { class: 'exp-actions' },
-      el('button', { type: 'button', class: 'link', onclick: () => startEdit(e) }, 'Edit'),
+      'button',
+      { type: 'button', class: 'row' + (editingId === e.id ? ' on' : ''), onclick: () => startEdit(e) },
       el(
-        'button',
-        {
-          type: 'button',
-          class: 'link danger',
-          onclick: async () => {
-            if (!confirm(`Delete "${e.description}"?`)) return;
-            if (editingId === e.id) resetForm();
-            try {
-              await store.remove(e.id);
-            } catch (err) {
-              alert('Could not delete: ' + err.message);
-            }
-          },
-        },
-        'Delete',
+        'span',
+        { class: 'row-main' },
+        el('span', { class: 'row-title' }, e.description),
+        el('span', { class: 'muted' }, 'Paid by ' + e.paidBy + (detail ? ' · for ' + detail : '')),
       ),
+      el('span', { class: 'money' }, money(e.amount)),
     ),
   );
 }
@@ -393,19 +311,19 @@ function expenseRow(e) {
 function setStatus(state, text) {
   const s = $('status');
   s.dataset.state = state;
-  s.textContent = text;
+  s.textContent = { live: 'Live', local: 'This device only', offline: 'Offline', saving: 'Saving', connecting: '', error: 'Not connected' }[state] ?? '';
+  s.title = text;
 }
 
 // ---------- start ----------
 
-buildPayer();
-fillForm(loadDraft());
+fill(loadDraft());
 
 store = await openStore((list) => {
   expenses = list.filter((e) => e && typeof e.amount === 'number' && e.split);
   if (editingId && !expenses.some((e) => e.id === editingId)) {
     resetForm();
-    $('error').textContent = 'That expense was deleted by someone else.';
+    $('error').textContent = 'Someone else deleted that expense';
   }
   render();
 }, setStatus);
