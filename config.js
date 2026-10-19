@@ -8,6 +8,10 @@ export const CURRENCY = 'USD';
 // Change this to start a fresh trip later without losing the old one.
 export const TRIP_ID = 'trip-1';
 
+// true: the trip is over. Hides the expense form and shows the final
+// numbers read only. Set back to false to allow changes again.
+export const SETTLED = true;
+
 // From Firebase console > Settings > General > Your apps.
 // Set to null to save on this device only (no sharing).
 export const FIREBASE_CONFIG = {

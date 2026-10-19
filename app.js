@@ -1,4 +1,4 @@
-import { PEOPLE, CURRENCY, TRIP_ID } from './config.js';
+import { PEOPLE, CURRENCY, TRIP_ID, SETTLED } from './config.js';
 import { toCents, equalShares, sharesOf, balances, settle } from './split.js';
 import { openStore } from './store.js';
 
@@ -270,7 +270,7 @@ function render() {
           el(
             'li',
             {},
-            el('span', { class: 'who' }, el('span', {}, t.from), el('span', { class: 'muted pays' }, 'pays'), el('span', {}, t.to)),
+            el('span', { class: 'who' }, el('span', {}, t.from), el('span', { class: 'muted pays' }, SETTLED ? 'paid' : 'pays'), el('span', {}, t.to)),
             el('span', { class: 'money' }, money(t.amount)),
           ),
         )
@@ -297,8 +297,10 @@ function expenseRow(e) {
     'li',
     {},
     el(
-      'button',
-      { type: 'button', class: 'row' + (editingId === e.id ? ' on' : ''), onclick: () => startEdit(e) },
+      SETTLED ? 'div' : 'button',
+      SETTLED
+        ? { class: 'row' }
+        : { type: 'button', class: 'row' + (editingId === e.id ? ' on' : ''), onclick: () => startEdit(e) },
       el(
         'span',
         { class: 'row-main' },
@@ -312,6 +314,11 @@ function expenseRow(e) {
 
 function setStatus(state, text) {
   const s = $('status');
+  if (SETTLED) {
+    s.dataset.state = 'settled';
+    s.textContent = 'Expenses settled · Read only';
+    return;
+  }
   s.dataset.state = state;
   s.textContent = { live: 'Live', local: 'This device only', offline: 'Offline', saving: 'Saving', connecting: '', error: 'Not connected' }[state] ?? '';
   s.title = text;
@@ -333,6 +340,7 @@ $('theme').addEventListener('click', () => applyTheme(document.documentElement.d
 applyTheme(document.documentElement.dataset.theme === 'light');
 
 fill(loadDraft());
+form.hidden = SETTLED;
 
 store = await openStore((list) => {
   expenses = list.filter((e) => e && typeof e.amount === 'number' && e.split);
